@@ -57,22 +57,5 @@ function readData(file){
     return data;
 }
 
-function getArgs(){
-    var arr = {};
-    var last;
-    process.argv.forEach((a, idx) => {
-        if(idx > 1){
-            if(last){
-                arr[last] = a;
-                last = undefined;
-            }
-            else if(!last && a.match(/-\w+/)){
-                last = a.substring(1);
-            }
-        }
-    })
-    return arr;
-}
-
-module.exports = {parsePolicyData,writePolicyData, readData, getArgs };
+module.exports = {parsePolicyData,writePolicyData, readData };
 
