@@ -74,27 +74,5 @@ function getArgs(){
     return arr;
 }
 
-function parsePolicy(policy){
-    let data = []
-    let policyData = {}
-    let index = 0;   
-    for (var start = 2; start < policy.length; start+= 64) {
-        if( index == 9){
-            data.push('0x' + policy.substring(start+24,start+64));
-        }
-        else if (index > 9){
-            data.push('0x' + policy.substring(start+54,start+64));
-        }
-        else {
-            data.push('0x' + policy.substring(start,start+64));
-        }
-        index++;
-    }
-    policyData.data = data;
-
-    return policyData;
-}
-
-
-module.exports = {parsePolicy, parsePolicyData,writePolicyData, readData, getArgs };
+module.exports = {parsePolicyData,writePolicyData, readData, getArgs };
 
