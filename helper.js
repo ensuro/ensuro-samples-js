@@ -1,77 +1,53 @@
-var fs = require('fs');
+const fs = require('fs');
 
-var dict = {
-    'id': 0,
-    'payout': 0,
-    'premium': 0,
-    'scr': 0,
-    'lossProb': 0,
-    'purePremium': 0,
-    'premiumForEnsuro': 0,
-    'premiumForRm': 0,
-    'premiumForLps': 0,
-    'address': 0,
-    'start': 0,
-    'expiration': 0,
+function parsePolicyData(policy){
+
+    let policyData = {}
+    let data = []
+    let id = policy.substring(0,66);
+    policyId = parseInt(id, 16);
+    data.push(id);
+
+    let payout = '0x' + policy.substring(66,130);
+    data.push(payout);
+
+    let premium = '0x' + policy.substring(130,194);
+    data.push(premium);
+
+    let scr = '0x' + policy.substring(194,258);
+    data.push(scr);
+
+    let lossProb = '0x' + policy.substring(258,322);
+    data.push(lossProb);
+
+    let purePremium = '0x' + policy.substring(322,386);
+    data.push(purePremium);
+
+    let premiumForEnsuro = '0x' + policy.substring(386,450);
+    data.push(premiumForEnsuro);
+
+    let premiumForRm = '0x' + policy.substring(450,514);
+    data.push(premiumForRm);
+
+    let premiumForLps = '0x' + policy.substring(514,578);
+    data.push(premiumForLps);
+
+    let address = '0x' + policy.substring(602,642);
+    data.push(address);
+
+    let start = '0x' + policy.substring(696,706);
+    data.push(start);
+
+    let expiration = '0x' + policy.substring(760,770);
+    data.push(expiration);
+
+    policyData.data = data;
+    return policyData;
 }
 
-function parsePolicyData(data){
-    id = data.substring(0,66);
-    // id = parseInt(id, 16);
-    policyId = parseInt(id, 16);
-    dict.id = id
-
-    payout = '0x' + data.substring(66,130);
-    // payout = parseInt(payout, 16);
-    dict.payout = payout
-
-    premium = '0x' + data.substring(130,194);
-    // premium = parseInt(premium, 16);
-    dict.premium = premium
-
-
-    scr = '0x' + data.substring(194,258);
-    // scr = parseInt(scr, 16);
-    dict.scr = scr
-
-
-    lossProb = '0x' + data.substring(258,322);
-    // lossProb = parseInt(lossProb, 16);
-    dict.lossProb = lossProb
-
-    
-    purePremium = '0x' + data.substring(322,386);
-    // purePremium = parseInt(purePremium, 16);
-    dict.purePremium = purePremium
-
-
-    premiumForEnsuro = '0x' + data.substring(386,450);
-    // premiumForEnsuro = parseInt(premiumForEnsuro, 16);
-    dict.premiumForEnsuro = premiumForEnsuro
-
-
-    premiumForRm = '0x' + data.substring(450,514);
-    // premiumForRm = parseInt(premiumForRm, 16);
-    dict.premiumForRm = premiumForRm
-
-
-    premiumForLps = '0x' + data.substring(514,578);
-    // premiumForLps = parseInt(premiumForLps, 16);
-    dict.premiumForLps = premiumForLps
-
-
-    address = '0x' + data.substring(578,642);
-    dict.address = address
-
-    start = '0x' + data.substring(642,706);
-    // start = parseInt(start, 16);
-    dict.start = start
-
-    expiration = '0x' + data.substring(706,770);
-    // expiration = parseInt(expiration, 16);
-    dict.expiration = expiration
-
-    fs.writeFile("./PolicyData-"+policyId+".json", JSON.stringify(dict, null, 4), (err) => {
+function writePolicyData(policyData){
+    policyId = parseInt(policyData.data[0], 16);
+    fs.writeFile("./PolicyData-"+policyId+".json", JSON.stringify(policyData, null, 4), (err) => {
         if (err) {  console.error(err);  return; };
     });
 }
@@ -98,31 +74,27 @@ function getArgs(){
     return arr;
 }
 
-function parsePolicy(data){
-    var test = []
-    var d = {}
-    var start = 2 
-    var k = 0;   
-    for (var i = 2; i < data.length; i+= 64) {
-        if( k == 9){
-            test.push('0x' + data.substring(start+24,start+64));
+function parsePolicy(policy){
+    let data = []
+    let policyData = {}
+    let index = 0;   
+    for (var start = 2; start < policy.length; start+= 64) {
+        if( index == 9){
+            data.push('0x' + policy.substring(start+24,start+64));
         }
-        else if (k > 9){
-            test.push('0x' + data.substring(start+54,start+64));
+        else if (index > 9){
+            data.push('0x' + policy.substring(start+54,start+64));
         }
         else {
-            test.push('0x' + data.substring(start,start+64));
+            data.push('0x' + policy.substring(start,start+64));
         }
-        start +=64;
-        k++;
+        index++;
     }
-    d.data = test;
-    policyId = parseInt(d.data[0], 16);
-    fs.writeFile("./PolicyData-"+policyId+".json", JSON.stringify(d, null, 4), (err) => {
-        if (err) {  console.error(err);  return; };
-    });
+    policyData.data = data;
+
+    return policyData;
 }
 
 
-module.exports = {parsePolicy, parsePolicyData, readData, getArgs };
+module.exports = {parsePolicy, parsePolicyData,writePolicyData, readData, getArgs };
 
