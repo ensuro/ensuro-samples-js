@@ -69,13 +69,22 @@ function decodeNewPolicyReceipt(receipt) {
     return parsePolicyData(events[0].data);
 }
 
-async function resolve(policyData, customerWon, rm){
+async function resolvePolicyFullPayout(policyData, customerWon, rm) {
     const tx = await rm.resolvePolicyFullPayout(policyData, customerWon,
         {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                             // transaction - remove in production
     );
-    console.log(`Transaction created: ${tx.hash}`);
-    await tx.wait();
+    console.debug(`Transaction created: ${tx.hash}`);
+    return tx;
+}
+
+async function resolvePolicy(policyData, payout, rm) {
+    const tx = await rm.resolvePolicyFullPayout(policyData, _A(payout),
+        {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+                            // transaction - remove in production
+    );
+    console.debug(`Transaction created: ${tx.hash}`);
+    return tx;
 }
 
 function getDefenderRelaySigner(API_KEY, API_SECRET) {
@@ -128,7 +137,7 @@ function parsePolicyData(hexPolicyData){
 
     let address = '0x' + hexPolicyData.substring(602,642);
     data.push(address);
-    policyData.customer = address;
+    policyData.riskModule = address;
 
     let start = '0x' + hexPolicyData.substring(696,706);
     data.push(start);
@@ -143,7 +152,8 @@ function parsePolicyData(hexPolicyData){
 }
 
 module.exports = {
-    newPolicy, resolve, getDefenderRelaySigner, _A, _R, decodeNewPolicyReceipt, parsePolicyData,
+    newPolicy, resolvePolicy, resolvePolicyFullPayout, getDefenderRelaySigner, _A, _R,
+    decodeNewPolicyReceipt, parsePolicyData,
     PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT
 };
 
