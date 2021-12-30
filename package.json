@@ -2,7 +2,7 @@
   "name": "ens-samples",
   "version": "1.0.0",
   "description": "Samples for using Ensuro Contracts",
-  "main": "index.js",
+  "main": "cli.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

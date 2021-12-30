@@ -4,13 +4,12 @@ const { ethers } = require('ethers');
 const { abi } = require("./abis/TrustfulRiskModule.json");
 const fs = require('fs');
 
-const API_KEY = process.env.API_KEY;
-const API_SECRET = process.env.API_SECRET;
 const RM_ADDRESS = process.env.RM_ADDRESS;
 
 const yargs = require('yargs');
 const ensuro = require('./ensuro.js');
-const signer = ensuro.getDefenderRelaySigner(API_KEY, API_SECRET);
+const envsigner = require('./envsigner.js');
+const signer = envsigner.getSigner(process.env);
 
 async function newPolicyCommand(argv) {
   const rm = new ethers.Contract(argv.rmAddress, abi, signer);
