@@ -5,8 +5,8 @@ Samples for using Ensuro protocol.
 Environment variables:
 
 ```
-export API_KEY=<defender-api-key>
-export API_SECRET=<defender-api-secret>
+export RELAY_API_KEY=<defender-api-key>
+export RELAY_API_SECRET=<defender-api-secret>
 export RM_ADDRESS=<address-of-risk-module>
 ```
 
