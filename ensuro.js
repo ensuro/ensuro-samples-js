@@ -1,5 +1,11 @@
 const { ethers } = require('ethers');
 
+const ABIS = {
+  TrustfulRiskModule: require("./abis/TrustfulRiskModule.json").abi,
+  PolicyPool: require("./abis/PolicyPool.json").abi,
+  EToken: require("./abis/EToken.json").abi,
+};
+
 const _BN = ethers.BigNumber.from;
 const WAD = _BN(1e10).mul(_BN(1e8));  // 1e10*1e8=1e18
 const RAY = WAD.mul(_BN(1e9));  // 1e18*1e9=1e27
@@ -86,6 +92,19 @@ async function resolvePolicy(policyData, payout, rm) {
   return tx;
 }
 
+async function getETokens(pool, options) {
+  const etkCount = (await pool.getETokenCount()).toNumber();
+  const ret = [];
+  console.debug(etkCount);
+  // TODO: paralellize using Promise.all or something else
+  for (i=0; i<etkCount; i++) {
+    const etkAddress = await pool.getETokenAt(i);
+    console.debug(`etkAddress: ${etkAddress}`);
+    ret.push(new ethers.Contract(etkAddress, ABIS.EToken, pool.signer));
+  }
+  return ret;
+}
+
 function parsePolicyData(hexPolicyData){
   let policyData = {}
   let data = []
@@ -144,6 +163,6 @@ function parsePolicyData(hexPolicyData){
 
 module.exports = {
   newPolicy, resolvePolicy, resolvePolicyFullPayout, _A, _R,
-  decodeNewPolicyReceipt, parsePolicyData,
-  PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT
+  decodeNewPolicyReceipt, parsePolicyData, getETokens,
+  PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT, ABIS
 };

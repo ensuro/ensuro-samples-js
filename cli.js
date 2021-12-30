@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const { ethers } = require('ethers');
-const { abi } = require("./abis/TrustfulRiskModule.json");
 const fs = require('fs');
 
 const RM_ADDRESS = process.env.RM_ADDRESS;
@@ -12,7 +11,7 @@ const envsigner = require('./envsigner.js');
 const signer = envsigner.getSigner(process.env);
 
 async function newPolicyCommand(argv) {
-  const rm = new ethers.Contract(argv.rmAddress, abi, signer);
+  const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS.TrustfulRiskModule, signer);
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
   const tx = await ensuro.newPolicy(policyData, argv.customer, rm);
   // The transaction was sent to the blockchain. It might take sometime to approve, to
@@ -37,6 +36,15 @@ async function resolvePolicyCommand(argv) {
     tx = await ensuro.resolvePolicy(policyData.data, Number.parseFloat(argv.result), rm);
   }
   await tx.wait();
+}
+
+async function listETokens(argv) {
+  const pool = new ethers.Contract(argv.poolAddress, ensuro.ABIS.PolicyPool, signer);
+  const eTokens = await ensuro.getETokens(pool);
+  eTokens.forEach(async etk => {
+    const etkName = await etk.name();
+    console.log(`Token ${etkName}`);
+  });
 }
 
 yargs.scriptName("ensuro-cli")
@@ -68,5 +76,15 @@ yargs.scriptName("ensuro-cli")
       describe: 'Resolution of the policy. Might be "true" or "false" if full payout or number'
     });
   }, resolvePolicyCommand)
+  .command('list-etokens [--onlyActive] [--pool pool-address]', 'List ETokens', (yargs) => {
+    yargs.option("onlyActive", {
+      describe: "Show only active eTokens",
+      default: false
+    });
+    yargs.option("poolAddress", {
+      describe: "Pool Address",
+      default: process.env.POOL_ADDRESS
+    });
+  }, listETokens)
   .help()
   .argv;
