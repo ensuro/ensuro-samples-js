@@ -2,6 +2,7 @@ const { ethers } = require('ethers');
 
 const ABIS = {
   TrustfulRiskModule: require("./abis/TrustfulRiskModule.json").abi,
+  FlightDelayRiskModule: require("./abis/FlightDelayRiskModule.json").abi,
   PolicyPool: require("./abis/PolicyPool.json").abi,
   EToken: require("./abis/EToken.json").abi,
 };
@@ -68,6 +69,17 @@ async function newPolicy(data, customer, rm) {
   return tx;
 }
 
+async function newFlightDelayPolicy(data, customer, rm) {
+  const tx = await rm.newPolicy(
+    data.flight, data.departure, data.expectedArrival, data.tolerance,
+    _A(data.payout), _A(data.premium), _R(data.lossProb), customer,
+    {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+                        // transaction - remove in production
+  );
+  console.debug(`Transaction created: ${tx.hash}`);
+  return tx;
+}
+
 function decodeNewPolicyReceipt(receipt) {
   const events = receipt.logs.filter(e => e.topics[0] === NEW_POLICY_EVENT);
 
@@ -85,6 +97,21 @@ async function resolvePolicyFullPayout(policyData, customerWon, rm) {
 
 async function resolvePolicy(policyData, payout, rm) {
   const tx = await rm.resolvePolicyFullPayout(policyData, _A(payout),
+    {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+                       // transaction - remove in production
+  );
+  console.debug(`Transaction created: ${tx.hash}`);
+  return tx;
+}
+
+/**
+ * Triggers the resolution of a FlightDelay Policy without waiting
+ * the scheduled job / expiration
+ *
+ * @param policyId int  Id of the policy
+ */
+async function resolveFlightDelayPolicy(policyId, rm) {
+  const tx = await rm.resolvePolicy(policyId,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                        // transaction - remove in production
   );
@@ -162,7 +189,9 @@ function parsePolicyData(hexPolicyData){
 }
 
 module.exports = {
-  newPolicy, resolvePolicy, resolvePolicyFullPayout, _A, _R,
+  newPolicy, newFlightDelayPolicy,
+  resolvePolicy, resolvePolicyFullPayout, resolveFlightDelayPolicy,
+  _A, _R,
   decodeNewPolicyReceipt, parsePolicyData, getETokens,
   PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT, ABIS
 };
