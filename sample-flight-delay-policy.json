@@ -1,0 +1,9 @@
+{
+  "flight": "UAL488",
+  "departure": 1641481200,
+  "expectedArrival": 1641486660,
+  "tolerance": 7200,
+  "payout": 110.0,
+  "premium": 12.0,
+  "lossProb": 0.08
+}
