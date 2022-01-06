@@ -11,9 +11,13 @@ const envsigner = require('./envsigner.js');
 const signer = envsigner.getSigner(process.env);
 
 async function newPolicyCommand(argv) {
-  const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS.TrustfulRiskModule, signer);
+  const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS[argv.rmType], signer);
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
-  const tx = await ensuro.newPolicy(policyData, argv.customer, rm);
+  const fn = {
+    TrustfulRiskModule: ensuro.newPolicy,
+    FlightDelayRiskModule: ensuro.newFlightDelayPolicy
+  }[argv.rmType];
+  const tx = await fn(policyData, argv.customer, rm);
   // The transaction was sent to the blockchain. It might take sometime to approve, to
   // avoid sending duplicated policies, it's better to save the {tx.hash} and check asyncronously
   // the result of the transaction
@@ -28,13 +32,20 @@ async function newPolicyCommand(argv) {
 
 async function resolvePolicyCommand(argv) {
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
-  const rm = new ethers.Contract(policyData.riskModule, abi, signer);
+  const rm = new ethers.Contract(policyData.riskModule, ensuro.ABIS.TrustfulRiskModule, signer);
   let tx;
   if (argv.result.toLowerCase() == "false" || argv.result.toLowerCase() == "true") {
     tx = await ensuro.resolvePolicyFullPayout(policyData.data, argv.result.toLowerCase() == "true", rm);
   } else {
     tx = await ensuro.resolvePolicy(policyData.data, Number.parseFloat(argv.result), rm);
   }
+  await tx.wait();
+}
+
+async function resolveFDPolicyCommand(argv) {
+  const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS.FlightDelayRiskModule, signer);
+  let tx;
+  tx = await ensuro.resolveFlightDelayPolicy(argv.policyId, rm);
   await tx.wait();
 }
 
@@ -58,8 +69,13 @@ yargs.scriptName("ensuro-cli")
       type: 'string',
       describe: 'Address that pays the premium and receives the payout'
     });
+    yargs.option("rmType", {
+      describe: "Type of RiskModule",
+      default: "TrustfulRiskModule"
+    });
     yargs.option("rmAddress", {
       describe: "Address of the RiskModule contract ",
+      type: "string",
       default: RM_ADDRESS
     });
     yargs.option("outputFile", {
@@ -76,6 +92,18 @@ yargs.scriptName("ensuro-cli")
       describe: 'Resolution of the policy. Might be "true" or "false" if full payout or number'
     });
   }, resolvePolicyCommand)
+  .command('resolve-fd-policy <policyId> [--rm <rm-address>]',
+           'Triggers resolution of Flight Delay policy', (yargs) => {
+    yargs.positional('policyId', {
+      type: 'int',
+      describe: 'Id of the policy'
+    });
+    yargs.option("rmAddress", {
+      describe: "Address of the RiskModule contract ",
+      type: "string",
+      default: RM_ADDRESS
+    });
+  }, resolveFDPolicyCommand)
   .command('list-etokens [--onlyActive] [--pool pool-address]', 'List ETokens', (yargs) => {
     yargs.option("onlyActive", {
       describe: "Show only active eTokens",
