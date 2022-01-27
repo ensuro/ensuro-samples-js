@@ -61,6 +61,10 @@ async function newPolicy(data, customer, rm) {
     // it's a relative expiration timestamp;
     expiration = Math.floor(Date.now() / 1000) + expiration;
   }
+  if (data.premium === undefined) {
+    // premium undefined, compute it using getMinimumPremium
+    data.premium = await rm.getMinimumPremium(_A(data.payout), _R(data.lossProb), expiration);
+  }
   const tx = await rm.newPolicy(_A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production
