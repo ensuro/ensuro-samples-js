@@ -24,6 +24,12 @@ async function newPolicyCommand(argv) {
   const receipt = await tx.wait();
   const createPolicyData = ensuro.decodeNewPolicyReceipt(receipt);
   console.log(`New Policy was created with id: ${createPolicyData.id}`);
+  // Copy fields from input file into output file
+  if (argv.copyFields) {
+    argv.copyFields.split(",").forEach((fieldName) => {
+      createPolicyData[fieldName] = policyData[fieldName];
+    });
+  }
   const outputFile = argv.outputFile || `./PolicyData-${createPolicyData.id}.json`;
   fs.writeFile(outputFile, JSON.stringify(createPolicyData, null, 4), (err) => {
     if (err) {  console.error(err);  return; };
@@ -79,7 +85,12 @@ yargs.scriptName("ensuro-cli")
       default: RM_ADDRESS
     });
     yargs.option("outputFile", {
+      type: "string",
       describe: "Output file where the policy data will be saved (json)",
+    });
+    yargs.option("copyFields", {
+      type: "string",
+      describe: "Fields to copy from input file into output file",
     });
   }, newPolicyCommand)
   .command('resolve-policy <policyData> <result>', 'Resolve policy', (yargs) => {
