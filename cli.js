@@ -17,20 +17,20 @@ async function newPolicyCommand(argv) {
     TrustfulRiskModule: ensuro.newPolicy,
     FlightDelayRiskModule: ensuro.newFlightDelayPolicy
   }[argv.rmType];
-  const tx = await fn(policyData, argv.customer, rm);
+  const tx = await fn(argv.internalId, policyData, argv.customer, rm);
   // The transaction was sent to the blockchain. It might take sometime to approve, to
   // avoid sending duplicated policies, it's better to save the {tx.hash} and check asyncronously
   // the result of the transaction
   const receipt = await tx.wait();
   const createPolicyData = ensuro.decodeNewPolicyReceipt(receipt);
-  console.log(`New Policy was created with id: ${createPolicyData.id}`);
+  console.log(`New Policy was created with internalId: ${argv.internalId} - TX: ${tx.hash}`);
   // Copy fields from input file into output file
   if (argv.copyFields) {
     argv.copyFields.split(",").forEach((fieldName) => {
       createPolicyData[fieldName] = policyData[fieldName];
     });
   }
-  const outputFile = argv.outputFile || `./PolicyData-${createPolicyData.id}.json`;
+  const outputFile = argv.outputFile || `./PolicyData-${argv.internalId}.json`;
   fs.writeFile(outputFile, JSON.stringify(createPolicyData, null, 4), (err) => {
     if (err) {  console.error(err);  return; };
   });
@@ -51,7 +51,8 @@ async function resolvePolicyCommand(argv) {
 async function resolveFDPolicyCommand(argv) {
   const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS.FlightDelayRiskModule, signer);
   let tx;
-  tx = await ensuro.resolveFlightDelayPolicy(argv.policyId, rm);
+  let policyId = argv.rmAddress + argv.internalId.toString(16).padStart(24, "0");
+  tx = await ensuro.resolveFlightDelayPolicy(policyId, rm);
   await tx.wait();
 }
 
@@ -66,7 +67,12 @@ async function listETokens(argv) {
 
 yargs.scriptName("ensuro-cli")
   .usage('$0 <cmd> [args]')
-  .command('new-policy <policyData> <customer> [--rm <rm-address>]', 'Create new policy', (yargs) => {
+  .command('new-policy <internalId> <policyData> <customer> [--rm <rm-address>]',
+           'Create new policy', (yargs) => {
+    yargs.positional('internalId', {
+      type: 'number',
+      describe: 'Policy Internal Id'
+    });
     yargs.positional('policyData', {
       type: 'string',
       describe: 'Json file with the data of the policy to be created - See sample-policy.json'
@@ -103,11 +109,11 @@ yargs.scriptName("ensuro-cli")
       describe: 'Resolution of the policy. Might be "true" or "false" if full payout or number'
     });
   }, resolvePolicyCommand)
-  .command('resolve-fd-policy <policyId> [--rm <rm-address>]',
+  .command('resolve-fd-policy <internalId> [--rm <rm-address>]',
            'Triggers resolution of Flight Delay policy', (yargs) => {
-    yargs.positional('policyId', {
-      type: 'int',
-      describe: 'Id of the policy'
+    yargs.positional('internalId', {
+      type: 'number',
+      describe: 'Internal Id of the policy'
     });
     yargs.option("rmAddress", {
       describe: "Address of the RiskModule contract ",

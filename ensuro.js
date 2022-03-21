@@ -55,7 +55,7 @@ function _R(value) {
   return _BN(value).mul(RAY);
 }
 
-async function newPolicy(data, customer, rm) {
+async function newPolicy(internalId, data, customer, rm) {
   let expiration = data.expiration;
   if (expiration < 1600000000) {
     // it's a relative expiration timestamp;
@@ -65,7 +65,8 @@ async function newPolicy(data, customer, rm) {
     // premium undefined, compute it using getMinimumPremium
     data.premium = await rm.getMinimumPremium(_A(data.payout), _R(data.lossProb), expiration);
   }
-  const tx = await rm.newPolicy(_A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer,
+  const tx = await rm.newPolicy(
+    _A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer, internalId,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production
   );
@@ -73,10 +74,10 @@ async function newPolicy(data, customer, rm) {
   return tx;
 }
 
-async function newFlightDelayPolicy(data, customer, rm) {
+async function newFlightDelayPolicy(internalId, data, customer, rm) {
   const tx = await rm.newPolicy(
     data.flight, data.departure, data.expectedArrival, data.tolerance,
-    _A(data.payout), _A(data.premium), _R(data.lossProb), customer,
+    _A(data.payout), _A(data.premium), _R(data.lossProb), customer, internalId,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production
   );
@@ -140,9 +141,8 @@ function parsePolicyData(hexPolicyData){
   let policyData = {}
   let data = []
   let id = hexPolicyData.substring(0,66);
-  const policyId = parseInt(id, 16);
-  data.push(policyId);
-  policyData.id = policyId;
+  data.push(id);
+  policyData.id = id;
 
   let payout = '0x' + hexPolicyData.substring(66,130);
   data.push(payout);

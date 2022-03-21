@@ -20,7 +20,7 @@ The account (or relay account) must have the role PRICER_ROLE to create policies
 ```bash
 
 npm install
-node cli.js new-policy sample-policy.json <customer-address>
+node cli.js new-policy 1234 sample-policy.json <customer-address>
 node cli.js resolve-policy PolicyData-1234.json true
 ```
 
@@ -47,7 +47,7 @@ Besides this scheduled job, you can force the resolution of the policy (uses the
 
 ```bash
 npm install
-node cli.js new-policy sample-flight-delay-policy.json <customer-address>
+node cli.js new-policy 1234 sample-flight-delay-policy.json <customer-address>
 node cli.js resolve-fd-policy 1234
 ```
 
