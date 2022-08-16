@@ -67,8 +67,8 @@ async function newPolicy(internalId, data, customer, rm) {
   }
   const tx = await rm.newPolicy(
     _A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer, internalId,
-    {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
-                        // transaction - remove in production
+    /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+                        // transaction - remove in production*/
   );
   console.debug(`Transaction created: ${tx.hash}`);
   return tx;
@@ -101,7 +101,7 @@ async function resolvePolicyFullPayout(policyData, customerWon, rm) {
 }
 
 async function resolvePolicy(policyData, payout, rm) {
-  const tx = await rm.resolvePolicyFullPayout(policyData, _A(payout),
+  const tx = await rm.resolvePolicy(policyData, _A(payout),
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                        // transaction - remove in production
   );
