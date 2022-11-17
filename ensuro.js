@@ -1,58 +1,47 @@
 const { ethers } = require('ethers');
 
-const ABIS = {
-  TrustfulRiskModule: require("./abis/TrustfulRiskModule.json").abi,
-  FlightDelayRiskModule: require("./abis/FlightDelayRiskModule.json").abi,
-  PolicyPool: require("./abis/PolicyPool.json").abi,
-  EToken: require("./abis/EToken.json").abi,
-};
-
-const _BN = ethers.BigNumber.from;
-const WAD = _BN(1e10).mul(_BN(1e8));  // 1e10*1e8=1e18
-const RAY = WAD.mul(_BN(1e9));  // 1e18*1e9=1e27
-
 const PRICER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PRICER_ROLE"));
 const RESOLVER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("RESOLVER_ROLE"));
 const NEW_POLICY_EVENT = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(
-  "NewPolicy(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,address,uint40,uint40))"
+  "NewPolicy(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,address,uint40,uint40))"
 ));
 
-function amountDecimals() {
-  // Decimals must be at least 6
-  let decimals = Number.parseInt(process.env.AMOUNT_DECIMALS || "6");
-  console.assert(decimals >= 6);
-  return decimals;
+/**
+ * Creates a fixed-point conversion function for the desired number of decimals
+ * @param decimals The number of decimals. Must be >= 6.
+ * @returns The amount function created. The function can receive strings (recommended),
+ *          floats/doubles (not recommended) and integers.
+ *
+ *          Floats will be rounded to 6 decimal before scaling.
+ */
+function amountFunction(decimals) {
+  return function (value) {
+    if (value === undefined) return undefined;
+
+    if (typeof value === "string" || value instanceof String) {
+      return ethers.utils.parseUnits(value, decimals);
+    }
+
+    if (!Number.isInteger(value)) {
+      return _BN(Math.round(value * 1e6)).mul(_BN(Math.pow(10, decimals - 6)));
+    }
+
+    return _BN(value).mul(_BN(10).pow(decimals));
+  };
 }
 
-/**
- * Function used to convert amounts - Takes int or float and returns a BigNumber with fixed decimals
- *
- * @param {value} Value to convert - If already BigNumber doesn't do anything
- */
-function _A(value) {
-  if (ethers.BigNumber.isBigNumber(value)){
-    return value;
+const _W = amountFunction(18);
+const _A = amountFunction(6);
+
+function getABI(contractName) {
+  if (contractName === "IERC20Metadata") {
+    return require("@ensuro/core/build/contracts/dependencies/IERC20Metadata.sol/IERC20Metadata.json").abi;
   }
-  if (typeof value === 'string' || value instanceof String) {
-    return _BN(value).mul(_BN(Math.pow(10, amountDecimals())));
+  if (contractName.startsWith("I")) {
+    return require(`@ensuro/core/build/contracts/interfaces/${contractName}.sol/${contractName}.json`).abi;
   } else {
-    return _BN(Math.round(value * 1e6)).mul(_BN(Math.pow(10, amountDecimals() - 6)));
+    return require(`@ensuro/core/build/contracts/${contractName}.sol/${contractName}.json`).abi;
   }
-}
-
-
-/**
- * Function used to convert to RAY (used for ratios, percentages, etc.)
- *
- * @param {value} Value to convert - If already BigNumber doesn't do anything
- */
-function _R(value) {
-  if (ethers.BigNumber.isBigNumber(value)){
-    return value;
-  }
-  if (!Number.isInteger(value))
-    return _BN(value * 1e9).mul(WAD);
-  return _BN(value).mul(RAY);
 }
 
 async function newPolicy(internalId, data, customer, rm) {
@@ -67,6 +56,31 @@ async function newPolicy(internalId, data, customer, rm) {
   }
   const tx = await rm.newPolicy(
     _A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer, internalId,
+    /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+                        // transaction - remove in production*/
+  );
+  console.debug(`Transaction created: ${tx.hash}`);
+  return tx;
+}
+
+async function newSignedQuotePolicy(data, customer, rm) {
+  let premium;
+  if (data.premium === null || data.premium === undefined) {
+    premium = ethers.constants.MaxUint256;
+  } else {
+    premium = _A(data.premium);
+  }
+  const tx = await rm.newPolicy(
+    _A(data.payout),  // Must be exactly the same payout sent to quote API
+    premium,  // If premium == null in the response, then ethers.constants.MaxUint256
+    _W(data.lossProb), // The lossProb received from quote API
+    data.expiration,  // Must be exactly the same expiration value sent to the API
+    customer,  // This is the address who owns the policy and will receive the payout,
+               // but the premium is paid by the message sender.
+    data.data_hash, // data_hash parameter from quote API response
+    data.quote.signature_r,  // signature.r in the API response
+    data.quote.signature_vs, // signature.vs in the API response
+    data.quote.valid_until,  // valid_until in the API response
     /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production*/
   );
@@ -193,9 +207,9 @@ function parsePolicyData(hexPolicyData){
 }
 
 module.exports = {
-  newPolicy, newFlightDelayPolicy,
+  newPolicy, newFlightDelayPolicy, newSignedQuotePolicy,
   resolvePolicy, resolvePolicyFullPayout, resolveFlightDelayPolicy,
-  _A, _R,
+  _A, _W,
   decodeNewPolicyReceipt, parsePolicyData, getETokens,
-  PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT, ABIS
+  PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT, getABI
 };

@@ -11,13 +11,15 @@ const envsigner = require('./envsigner.js');
 const signer = envsigner.getSigner(process.env);
 
 async function newPolicyCommand(argv) {
-  const rm = new ethers.Contract(argv.rmAddress, ensuro.ABIS[argv.rmType], signer);
+  const ABI = ensuro.getABI(argv.rmType);
+  const rm = new ethers.Contract(argv.rmAddress, ABI, signer);
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
   const fn = {
-    TrustfulRiskModule: ensuro.newPolicy,
+    TrustfulRiskModule: ensuro.newTrustfulPolicy,
+    SignedQuoteRiskModule: ensuro.newSignedQuotePolicy,
     FlightDelayRiskModule: ensuro.newFlightDelayPolicy
   }[argv.rmType];
-  const tx = await fn(argv.internalId, policyData, argv.customer, rm);
+  const tx = await fn(policyData, argv.customer, rm);
   // The transaction was sent to the blockchain. It might take sometime to approve, to
   // avoid sending duplicated policies, it's better to save the {tx.hash} and check asyncronously
   // the result of the transaction
@@ -56,26 +58,25 @@ async function resolveFDPolicyCommand(argv) {
   await tx.wait();
 }
 
-async function listETokens(argv) {
-  const pool = new ethers.Contract(argv.poolAddress, ensuro.ABIS.PolicyPool, signer);
-  const eTokens = await ensuro.getETokens(pool);
-  eTokens.forEach(async etk => {
-    const etkName = await etk.name();
-    console.log(`Token ${etkName}`);
-  });
+async function printTotalSupply(argv) {
+  const etk = new ethers.Contract(argv.etkAddress, ensuro.getABI("EToken"), signer);
+  const etkName = await etk.name();
+  const totalSupply = await etk.totalSupply();
+  console.log(`Token ${etkName}, totalSupply: ${totalSupply}`);
+}
+
+async function approve(argv) {
+  const token = new ethers.Contract(argv.erc20Address, ensuro.getABI("IERC20Metadata"), signer);
+  await token.approve(argv.spender, argv.approvalLimit);
 }
 
 yargs.scriptName("ensuro-cli")
   .usage('$0 <cmd> [args]')
-  .command('new-policy <internalId> <policyData> <customer> [--rm <rm-address>]',
+  .command('new-policy <policyData> <customer> [--rm <rm-address>]',
            'Create new policy', (yargs) => {
-    yargs.positional('internalId', {
-      type: 'number',
-      describe: 'Policy Internal Id'
-    });
     yargs.positional('policyData', {
       type: 'string',
-      describe: 'Json file with the data of the policy to be created - See sample-policy.json'
+      describe: 'Json file with the data of the policy to be created - See sample-policy-<rmType>.json'
     });
     yargs.positional('customer', {
       type: 'string',
@@ -121,15 +122,26 @@ yargs.scriptName("ensuro-cli")
       default: RM_ADDRESS
     });
   }, resolveFDPolicyCommand)
-  .command('list-etokens [--onlyActive] [--pool pool-address]', 'List ETokens', (yargs) => {
-    yargs.option("onlyActive", {
-      describe: "Show only active eTokens",
-      default: false
+  .command('print-total-supply [--etk-address etk-address]', 'Print EToken Total Supply', (yargs) => {
+    yargs.option("etkAddress", {
+      describe: "EToken Address",
+      type: "string",
     });
-    yargs.option("poolAddress", {
-      describe: "Pool Address",
-      default: process.env.POOL_ADDRESS
+  }, printTotalSupply)
+  .command('approve [--erc20Address address] [--spender address]', 'ERC20 Approval', (yargs) => {
+    yargs.option("erc20Address", {
+      describe: "ERC20 contract Address",
+      type: "string",
     });
-  }, listETokens)
+    yargs.option("spender", {
+      describe: "Spender Address",
+      type: "string",
+    });
+    yargs.option("approvalLimit", {
+      describe: "ERC20 contract Address",
+      type: "string",
+      default: ethers.constants.MaxUint256,
+    });
+  }, approve)
   .help()
   .argv;

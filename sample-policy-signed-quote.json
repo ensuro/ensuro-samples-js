@@ -1,0 +1,12 @@
+{
+  "payout": "100.2",
+  "premium": null,
+  "lossProb": "0.105",
+  "expiration": 1669584967,
+  "data_hash": "0x565732199cf7ae567fb584b7c6adf026d7a4e489e0ab1e01bd8cc4648061c0b1",
+  "quote": {
+    "signature_r": "0x67680da80522f8d5e56cd7553602446dede775754e2b316b2665b8777f49668a",
+    "signature_vs": "0x6297257a1192d171d130b217f2a4725f95e2b4b1cf142d3424fae7ec55e3dc40",
+    "valid_until": 1668803098
+  }
+}
