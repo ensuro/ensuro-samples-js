@@ -7,9 +7,12 @@ Environment variables:
 ```
 export RELAY_API_KEY=<defender-api-key>
 export RELAY_API_SECRET=<defender-api-secret>
+
 export RM_ADDRESS=<address-of-risk-module>
+export ACCOUNT_PK=<private-key-of-your-account>
 ```
 
+Alternatively you can set `WEB3_RPC_URL` to use a regular node instead of a defender relay. See `getSigner()` in `envsigner.js` for other options.
 
 ## TrustfullRiskModule
 
@@ -37,6 +40,19 @@ The policy parameters are sent in the JSON file (if using the CLI or as function
   "lossProb": 0.08,  // Probability of payout - 0.08 == 8%
   "expiration": 3600  // Expiration as relative time, can also be send as absolute epoch timestamp
 }
+```
+
+## SignedQuoteRiskModule
+
+For this module policies must be created by previously obtaining a valid signature from an offchain service.
+
+See [the ensuro docs](https://docs.ensuro.co/product-docs/offchain-apis/dynamic-pricing-api) for details on using this offchain service.
+
+A sample signed quote is available in [sample-signed-quote.json](./sample-signed-quote.json).
+
+```bash
+npm install
+node cli.js new-policy sample-policy-signed-quote.json <customer-address> --rmType SignedQuoteRiskModule
 ```
 
 ## FlightDelayRiskModule
