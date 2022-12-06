@@ -181,5 +181,5 @@ module.exports = {
   newPolicy, newFlightDelayPolicy, newSignedQuotePolicy,
   resolvePolicy, resolvePolicyFullPayout, resolveFlightDelayPolicy,
   _A, _W,
-  decodeNewPolicyReceipt,
+  decodeNewPolicyReceipt, getABI,
 };
