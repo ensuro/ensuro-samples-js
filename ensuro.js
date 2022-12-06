@@ -1,10 +1,6 @@
 const { ethers } = require('ethers');
 
-const PRICER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PRICER_ROLE"));
-const RESOLVER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("RESOLVER_ROLE"));
-const NEW_POLICY_EVENT = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(
-  "NewPolicy(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,address,uint40,uint40))"
-));
+const _BN = ethers.BigNumber.from;
 
 /**
  * Creates a fixed-point conversion function for the desired number of decimals
@@ -52,10 +48,10 @@ async function newPolicy(internalId, data, customer, rm) {
   }
   if (data.premium === undefined) {
     // premium undefined, compute it using getMinimumPremium
-    data.premium = await rm.getMinimumPremium(_A(data.payout), _R(data.lossProb), expiration);
+    data.premium = await rm.getMinimumPremium(_A(data.payout), _W(data.lossProb), expiration);
   }
   const tx = await rm.newPolicy(
-    _A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer, internalId,
+    _A(data.payout), _A(data.premium), _W(data.lossProb), expiration, customer, internalId,
     /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production*/
   );
@@ -81,7 +77,7 @@ async function newSignedQuotePolicy(data, customer, rm) {
     data.quote.signature_r,  // signature.r in the API response
     data.quote.signature_vs, // signature.vs in the API response
     data.quote.valid_until,  // valid_until in the API response
-    /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
+    {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production*/
   );
   console.debug(`Transaction created: ${tx.hash}`);
@@ -91,7 +87,7 @@ async function newSignedQuotePolicy(data, customer, rm) {
 async function newFlightDelayPolicy(internalId, data, customer, rm) {
   const tx = await rm.newPolicy(
     data.flight, data.departure, data.expectedArrival, data.tolerance,
-    _A(data.payout), _A(data.premium), _R(data.lossProb), customer, internalId,
+    _A(data.payout), _A(data.premium), _W(data.lossProb), customer, internalId,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production
   );
@@ -99,10 +95,53 @@ async function newFlightDelayPolicy(internalId, data, customer, rm) {
   return tx;
 }
 
-function decodeNewPolicyReceipt(receipt) {
-  const events = receipt.logs.filter(e => e.topics[0] === NEW_POLICY_EVENT);
+/**
+ * Finds an event in the receipt
+ * @param {Interface} interface The interface of the contract that contains the requested event
+ * @param {TransactionReceipt} receipt Transaction receipt containing the events in the logs
+ * @param {String} eventName The name of the event we are interested in
+ * @returns {LogDescription}
+ */
+const getTransactionEvent = function (interface, receipt, eventName) {
+  // for each log in the transaction receipt
+  for (const log of receipt.events) {
+    let parsedLog;
+    try {
+      parsedLog = interface.parseLog(log);
+    } catch (error) {
+      continue;
+    }
+    if (parsedLog.name == eventName) {
+      return parsedLog;
+    }
+  }
+  return null; // not found
+};
 
-  return parsePolicyData(events[0].data);
+function decodeNewPolicyReceipt(receipt) {
+  const poolInterface = new ethers.utils.Interface(getABI("PolicyPool"));
+  const evt = getTransactionEvent(poolInterface, receipt, "NewPolicy");
+  const policy = evt.args.policy;
+  return {
+    riskModule: policy.riskModule,
+    // Returns the PolicyData as tuple, it will be required for expiration or resolution transactions
+    data: [
+      policy.id.toHexString(),
+      policy.payout.toHexString(),
+      policy.premium.toHexString(),
+      policy.jrScr.toHexString(),
+      policy.srScr.toHexString(),
+      policy.lossProb.toHexString(),
+      policy.purePremium.toHexString(),
+      policy.ensuroCommission.toHexString(),
+      policy.partnerCommission.toHexString(),
+      policy.jrCoc.toHexString(),
+      policy.srCoc.toHexString(),
+      policy.riskModule,
+      policy.start,
+      policy.expiration,
+    ],
+  };
 }
 
 async function resolvePolicyFullPayout(policyData, customerWon, rm) {
@@ -138,78 +177,9 @@ async function resolveFlightDelayPolicy(policyId, rm) {
   return tx;
 }
 
-async function getETokens(pool, options) {
-  const etkCount = (await pool.getETokenCount()).toNumber();
-  const ret = [];
-  console.debug(etkCount);
-  // TODO: paralellize using Promise.all or something else
-  for (i=0; i<etkCount; i++) {
-    const etkAddress = await pool.getETokenAt(i);
-    console.debug(`etkAddress: ${etkAddress}`);
-    ret.push(new ethers.Contract(etkAddress, ABIS.EToken, pool.signer));
-  }
-  return ret;
-}
-
-function parsePolicyData(hexPolicyData){
-  let policyData = {}
-  let data = []
-  let id = hexPolicyData.substring(0,66);
-  data.push(id);
-  policyData.id = id;
-
-  let payout = '0x' + hexPolicyData.substring(66,130);
-  data.push(payout);
-  policyData.payout = payout;
-
-  let premium = '0x' + hexPolicyData.substring(130,194);
-  data.push(premium);
-  policyData.premium = premium;
-
-  let scr = '0x' + hexPolicyData.substring(194,258);
-  data.push(scr);
-  policyData.scr = scr;
-
-  let lossProb = '0x' + hexPolicyData.substring(258,322);
-  data.push(lossProb);
-  policyData.lossProb = lossProb;
-
-  let purePremium = '0x' + hexPolicyData.substring(322,386);
-  data.push(purePremium);
-  policyData.purePremium = purePremium;
-
-  let premiumForEnsuro = '0x' + hexPolicyData.substring(386,450);
-  data.push(premiumForEnsuro);
-  policyData.premiumForEnsuro = premiumForEnsuro;
-
-  let premiumForRm = '0x' + hexPolicyData.substring(450,514);
-  data.push(premiumForRm);
-  policyData.premiumForRm = premiumForRm;
-
-  let premiumForLps = '0x' + hexPolicyData.substring(514,578);
-  data.push(premiumForLps);
-  policyData.premiumForLps = premiumForLps;
-
-  let address = '0x' + hexPolicyData.substring(602,642);
-  data.push(address);
-  policyData.riskModule = address;
-
-  let start = '0x' + hexPolicyData.substring(696,706);
-  data.push(start);
-  policyData.start = start;
-
-  let expiration = '0x' + hexPolicyData.substring(760,770);
-  data.push(expiration);
-  policyData.expiration = expiration;
-
-  policyData.data = data;
-  return policyData;
-}
-
 module.exports = {
   newPolicy, newFlightDelayPolicy, newSignedQuotePolicy,
   resolvePolicy, resolvePolicyFullPayout, resolveFlightDelayPolicy,
   _A, _W,
-  decodeNewPolicyReceipt, parsePolicyData, getETokens,
-  PRICER_ROLE, RESOLVER_ROLE, NEW_POLICY_EVENT, getABI
+  decodeNewPolicyReceipt, getABI,
 };

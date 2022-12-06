@@ -2,6 +2,8 @@
 
 const { ethers } = require('ethers');
 const fs = require('fs');
+const axios = require("axios");
+
 
 const RM_ADDRESS = process.env.RM_ADDRESS;
 
@@ -25,22 +27,23 @@ async function newPolicyCommand(argv) {
   // the result of the transaction
   const receipt = await tx.wait();
   const createPolicyData = ensuro.decodeNewPolicyReceipt(receipt);
-  console.log(`New Policy was created with internalId: ${argv.internalId} - TX: ${tx.hash}`);
+  console.log(`New Policy was created - TX: ${tx.hash}`);
   // Copy fields from input file into output file
   if (argv.copyFields) {
     argv.copyFields.split(",").forEach((fieldName) => {
       createPolicyData[fieldName] = policyData[fieldName];
     });
   }
-  const outputFile = argv.outputFile || `./PolicyData-${argv.internalId}.json`;
+  const outputFile = argv.outputFile || `./PolicyData-${tx.hash}.json`;
   fs.writeFile(outputFile, JSON.stringify(createPolicyData, null, 4), (err) => {
     if (err) {  console.error(err);  return; };
   });
 }
 
 async function resolvePolicyCommand(argv) {
+  const ABI = ensuro.getABI(argv.rmType);
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
-  const rm = new ethers.Contract(policyData.riskModule, ensuro.ABIS.TrustfulRiskModule, signer);
+  const rm = new ethers.Contract(policyData.riskModule || policyData.data[11], ABI, signer);
   let tx;
   if (argv.result.toLowerCase() == "false" || argv.result.toLowerCase() == "true") {
     tx = await ensuro.resolvePolicyFullPayout(policyData.data, argv.result.toLowerCase() == "true", rm);
@@ -67,7 +70,77 @@ async function printTotalSupply(argv) {
 
 async function approve(argv) {
   const token = new ethers.Contract(argv.erc20Address, ensuro.getABI("IERC20Metadata"), signer);
-  await token.approve(argv.spender, argv.approvalLimit);
+  const tx = await token.approve(argv.spender, argv.approvalLimit);
+  console.log(`Approval transaction sent - TX: ${tx.hash}`);
+}
+
+async function faucet(argv) {
+  const ABI = [{
+    "inputs": [],
+    "name": "tap",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }];
+  const faucet = new ethers.Contract(argv.faucetContract, ABI, signer);
+  const tx = await faucet.tap();
+  console.log(`Faucet tap transaction sent - TX: ${tx.hash}`);
+}
+
+async function quotePolicy(argv) {
+  /**
+   * curl --request POST \
+   * --url https://dynamic-pricing-btzmg4hp.nw.gateway.dev/api/v0/dlt \
+   * --header 'accept: application/application/json' \
+   * --header 'content-type: application/json' \
+   * --header 'x-api-key: <APIKEY-FROM-ENV>' \
+   * --data '{"payout": "5000","expiration": "2023-01-01T21:36:07.211025Z",
+   *          "data": {"payout_type": "proportional", "client_name": "Foo Inc."}}'
+   */
+  const API_KEY = process.env.QUOTE_API_KEY;
+  if (!API_KEY) {
+    console.log("Error, API key not defined, must define environment variable QUOTE_API_KEY");
+    return;
+  }
+  let expiration;
+  if (argv.expiration.match(RegExp("^1[0-9]{9}$"))) {
+    // Timestamp
+    expiration = parseInt(argv.expiration);
+  } else if (argv.expiration.match(RegExp("^[0-9]{1,8}$"))) {
+    // Relative Timestamp
+    expiration = Math.round((new Date()).getTime() / 1000) + parseInt(argv.expiration);
+  } else {
+    // Assume timestamp in ISO-8601 format
+    expiration = argv.expiration;
+  }
+  const jsonParams = {payout: argv.payout, expiration: expiration, data: JSON.parse(argv.jsonData)};
+  console.log(`Calling '${argv.apiEndpoint}' with these params: `, jsonParams);
+  const response = await axios.post(
+    argv.apiEndpoint,
+    jsonParams,
+    {headers: {"x-api-key": API_KEY}}
+  );
+  if (argv.outputFile == "-") {
+    console.log("Response: ", response.data);
+  } else {
+    // If saving to a file, I save in the format required by newPolicyCommand for signed quotes,
+    // similar to `sample-policy-signed-quote.json`
+    const output = {
+      payout: argv.payout,
+      premium: response.data.premium,
+      lossProb: response.data.loss_prob,
+      expiration: response.data.expiration,
+      data_hash: response.data.data_hash,
+      quote: {
+        signature_r: response.data.signature.r,
+        signature_vs: response.data.signature.vs,
+        valid_until: response.data.valid_until,
+      }
+    }
+    fs.writeFile(argv.outputFile, JSON.stringify(output, null, 4), (err) => {
+      if (err) {  console.error(err);  return; };
+    });
+  }
 }
 
 yargs.scriptName("ensuro-cli")
@@ -84,7 +157,7 @@ yargs.scriptName("ensuro-cli")
     });
     yargs.option("rmType", {
       describe: "Type of RiskModule",
-      default: "TrustfulRiskModule"
+      default: "SignedQuoteRiskModule"
     });
     yargs.option("rmAddress", {
       describe: "Address of the RiskModule contract ",
@@ -100,6 +173,34 @@ yargs.scriptName("ensuro-cli")
       describe: "Fields to copy from input file into output file",
     });
   }, newPolicyCommand)
+  .command('quote-policy <apiEndpoint>',
+           'Get a signed quote from API', (yargs) => {
+    yargs.positional('apiEndpoint', {
+      type: 'string',
+      describe: `The Quote API endpoint.
+Example: https://dynamic-pricing-btzmg4hp.nw.gateway.dev/api/v0/<customer>`
+    });
+    yargs.option('jsonData', {
+      type: 'string',
+      describe: `Extra data of the policy to be used for the quote and stored.
+It will be converted to a blind hash on-chain`
+    });
+    yargs.option("payout", {
+      describe: "Maximum payout of the policy",
+      type: 'number',
+    });
+    yargs.option("expiration", {
+      describe: `Expiration of the policy.
+Can be sent as ISO 8601 timestamp, epoch timestamp or integer (seconds relative to now)`,
+      type: 'string',
+      default: '2592000', // 30 days (in seconds)
+    });
+    yargs.option("outputFile", {
+      type: "string",
+      describe: "Output file where the policy data will be saved (json). Default stdout",
+      default: "-"
+    });
+  }, quotePolicy)
   .command('resolve-policy <policyData> <result>', 'Resolve policy', (yargs) => {
     yargs.positional('policyData', {
       type: 'string',
@@ -108,6 +209,10 @@ yargs.scriptName("ensuro-cli")
     yargs.positional('result', {
       type: 'string',
       describe: 'Resolution of the policy. Might be "true" or "false" if full payout or number'
+    });
+    yargs.option("rmType", {
+      describe: "Type of RiskModule",
+      default: "SignedQuoteRiskModule"
     });
   }, resolvePolicyCommand)
   .command('resolve-fd-policy <internalId> [--rm <rm-address>]',
@@ -132,6 +237,7 @@ yargs.scriptName("ensuro-cli")
     yargs.option("erc20Address", {
       describe: "ERC20 contract Address",
       type: "string",
+      default: "0x9aa7fEc87CA69695Dd1f879567CcF49F3ba417E2",
     });
     yargs.option("spender", {
       describe: "Spender Address",
@@ -143,5 +249,12 @@ yargs.scriptName("ensuro-cli")
       default: ethers.constants.MaxUint256,
     });
   }, approve)
+  .command('faucet [--faucet-contract address]', 'Ask money to the faucet contract (only testnet)', (yargs) => {
+    yargs.option("faucetContract", {
+      describe: "Address of the Faucet contract that implements `tap` function",
+      type: "string",
+      default: "0x79E8FEb6e99204858F62C1EFcE607ec279E6c4CA",
+    });
+  }, faucet)
   .help()
   .argv;

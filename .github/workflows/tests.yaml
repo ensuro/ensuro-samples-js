@@ -1,0 +1,31 @@
+name: Test Quote-NewPolicy-Resolve flow
+on: [push]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+          cache: "npm"
+      - run: npm ci
+      - env:
+          RELAY_API_KEY: ${{ secrets.RELAY_API_KEY }}
+          RELAY_API_SECRET: ${{ secrets.RELAY_API_SECRET }}
+          QUOTE_API_URL: ${{ secrets.QUOTE_API_URL }}
+          QUOTE_API_KEY: ${{ secrets.QUOTE_API_KEY }}
+          QUOTE_JSON_DATA: ${{ secrets.QUOTE_JSON_DATA }}
+          RM_ADDRESS: ${{ secrets.RM_ADDRESS }}
+          CUSTOMER: "0xD758aF6BFC2f0908D7C5f89942be52C36a6b3cab"
+        run: |
+          ./cli.js quote-policy $QUOTE_API_URL --payout 5000 --json-data "$QUOTE_JSON_DATA" --output-file signed-quote-policy-input.json
+          sleep 15
+          ./cli.js new-policy signed-quote-policy-input.json $CUSTOMER --output-file signed-quote-policy-output.json
+          sleep 15
+          ./cli.js resolve-policy signed-quote-policy-output.json 3000
