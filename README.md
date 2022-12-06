@@ -24,6 +24,8 @@ export WEB3_RPC_URL=<RPC-url-such-as-https://polygon-mumbai.g.alchemy.com/v2/api
 export ACCOUNT_PK=<private key of the address, starting with 0x>
 ```
 
+See `getSigner()` in `envsigner.js` for other options.
+
 ## Pre-requisite - Money
 
 The authenticated account sending the transactions needs USDC (besides the gas, check https://mumbaifaucet.com/ if you need MATIC on Mumbai). Also, you need to **approve** the spending of that USDC by the Ensuro protocol, at least for the amount of the premium.
@@ -110,6 +112,19 @@ The policy parameters are sent in the JSON file (if using the CLI or as function
   "lossProb": 0.08,  // Probability of payout - 0.08 == 8%
   "expiration": 3600  // Expiration as relative time, can also be send as absolute epoch timestamp
 }
+```
+
+## SignedQuoteRiskModule
+
+For this module policies must be created by previously obtaining a valid signature from an offchain service.
+
+See [the ensuro docs](https://docs.ensuro.co/product-docs/offchain-apis/dynamic-pricing-api) for details on using this offchain service.
+
+A sample signed quote is available in [sample-signed-quote.json](./sample-signed-quote.json).
+
+```bash
+npm install
+node cli.js new-policy sample-policy-signed-quote.json <customer-address> --rmType SignedQuoteRiskModule
 ```
 
 ## FlightDelayRiskModule

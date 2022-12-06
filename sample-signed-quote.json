@@ -1,0 +1,14 @@
+{
+  "contract_address": "0x8c5f6aEB655D687929a82c5d430Ec56abaDdc0c8",
+  "data_hash": "0xf6e5eac638ca965d8776dbb87ff46fbdf08f1a60671798b54e53a0d4299e7c87",
+  "expiration": 1672176967,
+  "loss_prob": "0.105",
+  "premium": null,
+  "quote_id": "3952b4e4-a63e-44b7-852f-f9b104f33ee3",
+  "signature": {
+    "hash": "0x53674bd69cc8ac5e38ffa5a949e2d920fd3775e8dfb1409f264f474635261287",
+    "r": "0x8a72f1bd816e551feef07db9c75c068ebfd01dc36daad95717e2214081e0c60c",
+    "vs": "0x9c95f1f3ea8d3ee0221f5b126f7d15e04431161369633b7773c028551460b15f"
+  },
+  "valid_until": 1669125344
+}
