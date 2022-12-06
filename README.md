@@ -26,11 +26,11 @@ export ACCOUNT_PK=<private key of the address, starting with 0x>
 
 ## Pre-requisite - Money
 
-The authenticated account sending the transactions needs USDC (besides the gas, check https://mumbaifaucet.com/ if you need MATIC on Mumbai). Also, you need to **aprove** the spending of that USDC by the Ensuro protocol, at least for the amount of the premium.
+The authenticated account sending the transactions needs USDC (besides the gas, check https://mumbaifaucet.com/ if you need MATIC on Mumbai). Also, you need to **approve** the spending of that USDC by the Ensuro protocol, at least for the amount of the premium.
 
 On testnet, we use [this contract](https://mumbai.polygonscan.com/address/0x9aa7fec87ca69695dd1f879567ccf49f3ba417e2) as currency for the protocol.
 
-We provide usefull commands to use our faucet to get test USDC and to approve the spending.
+We provide useful commands to use our faucet to get test USDC and approve the spending.
 
 ```bash
 export POOL_ADDRESS=0x77066b63c710B4fA352018E0D8Af0e5cC7243181 # Mumbai address of Ensuro Pool
