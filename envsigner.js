@@ -11,7 +11,7 @@ function getDefenderRelaySigner(API_KEY, API_SECRET) {
 function getSigner(env) {
   if (env.RELAY_API_KEY) {
     return getDefenderRelaySigner(env.RELAY_API_KEY, env.RELAY_API_SECRET);
-  } else {
+  } else if (env.ACCOUNT_PK) {
     let provider;
     if (env.WEB3_RPC_URL) {
       provider = new ethers.providers.JsonRpcProvider(env.WEB3_RPC_URL);
@@ -25,7 +25,12 @@ function getSigner(env) {
         options.etherscan = env.WEB3_ETHERSCAN_TOKEN;
       provider = ethers.getDefaultProvider(env.WEB3_NETWORK, options);
     }
-    return new ethers.Wallet(env.ACCOUNT_PK, provider);
+    const wallet = new ethers.Wallet(env.ACCOUNT_PK, provider);
+    console.debug(`Loaded wallet from PK, address: ${wallet.address}`);
+    return wallet;
+  } else {
+    console.error("Invalid authentication setup, need to define RELAY_API_KEY or ACCOUNT_PK env variables");
+    return null;
   }
 }
 
