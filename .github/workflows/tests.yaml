@@ -26,6 +26,6 @@ jobs:
         run: |
           ./cli.js quote-policy $QUOTE_API_URL --payout 5000 --json-data "$QUOTE_JSON_DATA" --output-file signed-quote-policy-input.json
           sleep 15
-          ./cli.js new-policy signed-quote-policy-input.json $CUSTOMER --output-file signed-quote-policy-input.json
+          ./cli.js new-policy signed-quote-policy-input.json $CUSTOMER --output-file signed-quote-policy-output.json
           sleep 15
           ./cli.js resolve-policy signed-quote-policy-output.json 3000
