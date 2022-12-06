@@ -48,10 +48,10 @@ async function newPolicy(internalId, data, customer, rm) {
   }
   if (data.premium === undefined) {
     // premium undefined, compute it using getMinimumPremium
-    data.premium = await rm.getMinimumPremium(_A(data.payout), _R(data.lossProb), expiration);
+    data.premium = await rm.getMinimumPremium(_A(data.payout), _W(data.lossProb), expiration);
   }
   const tx = await rm.newPolicy(
-    _A(data.payout), _A(data.premium), _R(data.lossProb), expiration, customer, internalId,
+    _A(data.payout), _A(data.premium), _W(data.lossProb), expiration, customer, internalId,
     /*{gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production*/
   );
@@ -87,7 +87,7 @@ async function newSignedQuotePolicy(data, customer, rm) {
 async function newFlightDelayPolicy(internalId, data, customer, rm) {
   const tx = await rm.newPolicy(
     data.flight, data.departure, data.expectedArrival, data.tolerance,
-    _A(data.payout), _A(data.premium), _R(data.lossProb), customer, internalId,
+    _A(data.payout), _A(data.premium), _W(data.lossProb), customer, internalId,
     {gasLimit: 999999} // This is to force sending transactions that will fail (to see the error in the
                         // transaction - remove in production
   );
