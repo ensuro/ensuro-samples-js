@@ -28,17 +28,17 @@ jobs:
       - env:
           RELAY_API_KEY: ${{ secrets.RELAY_API_KEY }}
           RELAY_API_SECRET: ${{ secrets.RELAY_API_SECRET }}
-          # QUOTE_API_URL: ${{ secrets.QUOTE_API_URL }}
-          # QUOTE_API_KEY: ${{ secrets.QUOTE_API_KEY }}
-          # QUOTE_JSON_DATA: ${{ secrets.QUOTE_JSON_DATA }}
+          QUOTE_API_URL: ${{ github.event.inputs.api_url }}
+          QUOTE_API_KEY: ${{ github.event.inputs.api_key }}
+          QUOTE_JSON_DATA: ${{ github.event.inputs.json_data }}
           # RM_ADDRESS: ${{ secrets.RM_ADDRESS }}
           CUSTOMER: "0xD758aF6BFC2f0908D7C5f89942be52C36a6b3cab"
         run: |
           echo "Getting RM Address using OPTIONS..."
-          echo "::add-mask::${{ github.event.inputs.api_key }}"
-          echo "::add-mask::${{ github.event.inputs.api_url }}"
-          export RM_ADDRESS=`curl -s --request OPTIONS --url ${{ github.event.inputs.api_url }} --header 'x-api-key: ${{ github.event.inputs.api_key }}' --header 'accept: application/application/json' --header 'content-type: application/json'  | jq ".risk_module" `
-          echo "RiskModule: $RM_ADDRESS"
+          echo "::add-mask::$QUOTE_API_URL"
+          echo "::add-mask::$QUOTE_API_KEY"
+          export RM_ADDRESS=`curl -s --request OPTIONS --url $QUOTE_API_URL --header "x-api-key: $QUOTE_API_KEY" --header 'accept: application/application/json' --header 'content-type: application/json'  | jq ".risk_module" | tr -d '"' `
+          echo "RiskModule: '$RM_ADDRESS'"
           export QUOTE_API_KEY=${{ github.event.inputs.api_key }}
           ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout 5000 --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
           sleep 15
