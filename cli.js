@@ -100,7 +100,7 @@ async function quotePolicy(argv) {
   const API_KEY = process.env.QUOTE_API_KEY;
   if (!API_KEY) {
     console.log("Error, API key not defined, must define environment variable QUOTE_API_KEY");
-    return;
+    process.exit(1);
   }
   let expiration;
   if (argv.expiration.match(RegExp("^1[0-9]{9}$"))) {
@@ -138,7 +138,10 @@ async function quotePolicy(argv) {
       }
     }
     fs.writeFile(argv.outputFile, JSON.stringify(output, null, 4), (err) => {
-      if (err) {  console.error(err);  return; };
+      if (err) {
+        console.error(err);
+        process.exit(1);
+      }
     });
   }
 }

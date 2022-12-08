@@ -32,8 +32,8 @@ jobs:
           CUSTOMER: "0xD758aF6BFC2f0908D7C5f89942be52C36a6b3cab"
         run: |
           echo "Getting RM Address using OPTIONS..."
-          QUOTE_API_URL=$(cat $GITHUB_EVENT_PATH | jq -r '.inputs.api_url' )
-          QUOTE_API_KEY=$(cat $GITHUB_EVENT_PATH | jq -r '.inputs.api_key' )
+          export QUOTE_API_URL=$(cat $GITHUB_EVENT_PATH | jq -r '.inputs.api_url' )
+          export QUOTE_API_KEY=$(cat $GITHUB_EVENT_PATH | jq -r '.inputs.api_key' )
           echo "::add-mask::$QUOTE_API_URL"
           echo "::add-mask::$QUOTE_API_KEY"
           export RM_ADDRESS=`curl -s --request OPTIONS --url $QUOTE_API_URL --header "x-api-key: $QUOTE_API_KEY" --header 'accept: application/application/json' --header 'content-type: application/json'  | jq -r ".risk_module"`
