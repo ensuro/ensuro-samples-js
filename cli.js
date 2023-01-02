@@ -61,6 +61,55 @@ async function resolveFDPolicyCommand(argv) {
   await tx.wait();
 }
 
+async function fetchRMParamsCommand(argv) {
+  const ABI = ensuro.getABI(argv.rmType);
+  const rm = new ethers.Contract(argv.rmAddress, ABI, signer);
+  const params = await ensuro.fetchRiskModuleParams(rm);
+  if (argv.outputFile == "-") {
+    console.log("Params: ", params);
+  } else {
+    fs.writeFile(argv.outputFile, JSON.stringify(params, null, 4), (err) => {
+      if (err) {
+        console.error(err);
+        process.exit(1);
+      }
+    });
+  }
+}
+
+async function computePremium(argv) {
+  let rmParams;
+  if (argv.rmParams) {
+    rmParams = JSON.parse(fs.readFileSync(argv.rmParams));
+  } else {
+    const ABI = ensuro.getABI(argv.rmType);
+    const rm = new ethers.Contract(argv.rmAddress, ABI, signer);
+    rmParams = await ensuro.fetchRiskModuleParams(rm);
+  }
+  let expiration;
+  if (argv.expiration >= 1672691181) {
+    // Timestamp
+    expiration = parseInt(argv.expiration);
+  } else if (argv.expiration < 1000) {
+    // Relative Timestamp in days
+    expiration = Math.round((new Date()).getTime() / 1000) + argv.expiration * 3600 * 24;
+  } else {
+    // Relative Timestamp in seconds
+    expiration = Math.round((new Date()).getTime() / 1000) + argv.expiration;
+  }
+  const result = ensuro.computePremium(rmParams, argv.payout, argv.lossProb, expiration);
+  if (argv.outputFile == "-") {
+    console.log("Result: ", result);
+  } else {
+    fs.writeFile(argv.outputFile, JSON.stringify(result, null, 4), (err) => {
+      if (err) {
+        console.error(err);
+        process.exit(1);
+      }
+    });
+  }
+}
+
 async function printTotalSupply(argv) {
   const etk = new ethers.Contract(argv.etkAddress, ensuro.getABI("EToken"), signer);
   const etkName = await etk.name();
@@ -230,6 +279,55 @@ Can be sent as ISO 8601 timestamp, epoch timestamp or integer (seconds relative 
       default: RM_ADDRESS
     });
   }, resolveFDPolicyCommand)
+  .command('fetch-rm-params [--rm <rm-address>]',
+           'Fetch Risk Module Params', (yargs) => {
+    yargs.option("rmAddress", {
+      describe: "Address of the RiskModule contract ",
+      type: "string",
+      default: RM_ADDRESS
+    });
+    yargs.option("rmType", {
+      describe: "Type of RiskModule",
+      default: "SignedQuoteRiskModule"
+    });
+    yargs.option("outputFile", {
+      type: "string",
+      describe: "Output file where the rm parameters will be saved (json). Default stdout",
+      default: "-"
+    });
+  }, fetchRMParamsCommand)
+  .command('compute-premium <payout> <lossProb> <expiration>',
+           'Fetch Risk Module Params', (yargs) => {
+    yargs.positional('payout', {
+      describe: "maximum payout of the policy",
+      type: 'number',
+    });
+    yargs.positional('lossProb', {
+      describe: "Probability of paying the maximum payout (lossProb * payout = expectedLoss)",
+      type: 'number',
+    });
+    yargs.positional('expiration', {
+      describe: "Policy expiration (relative in days if <1000, unix timestamp, else relative in seconds)",
+      type: 'number',
+    });
+    yargs.option("rmAddress", {
+      describe: "Address of the RiskModule contract ",
+      type: "string",
+    });
+    yargs.option("rmParams", {
+      describe: "Json file with the Risk Module Params",
+      type: "string",
+    });
+    yargs.option("rmType", {
+      describe: "Type of RiskModule",
+      default: "SignedQuoteRiskModule"
+    });
+    yargs.option("outputFile", {
+      type: "string",
+      describe: "Output file where the rm parameters will be saved (json). Default stdout",
+      default: "-"
+    });
+  }, computePremium)
   .command('print-total-supply [--etk-address etk-address]', 'Print EToken Total Supply', (yargs) => {
     yargs.option("etkAddress", {
       describe: "EToken Address",
