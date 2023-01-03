@@ -177,9 +177,53 @@ async function resolveFlightDelayPolicy(policyId, rm) {
   return tx;
 }
 
+async function fetchRiskModuleParams(rm) {
+  const params = await rm.params();
+  const maxPayoutPerPolicy = await rm.maxPayoutPerPolicy();
+  const exposureLimit = await rm.exposureLimit();
+  const maxDuration = await rm.maxDuration();
+  const wadTo4 = _BN(10).pow(18 - 4);
+  const amountTo2 = _BN(10).pow(4);
+  return {
+    moc: params.moc.div(wadTo4).toNumber() / 10000,
+    jrCollRatio: params.jrCollRatio.div(wadTo4).toNumber() / 10000,
+    collRatio: params.collRatio.div(wadTo4).toNumber() / 10000,
+    ensuroPpFee: params.ensuroPpFee.div(wadTo4).toNumber() / 10000,
+    ensuroCocFee: params.ensuroCocFee.div(wadTo4).toNumber() / 10000,
+    jrRoc: params.jrRoc.div(wadTo4).toNumber() / 10000,
+    srRoc: params.srRoc.div(wadTo4).toNumber() / 10000,
+    maxPayoutPerPolicy: maxPayoutPerPolicy.div(amountTo2).toNumber() / 100,
+    exposureLimit: exposureLimit.div(amountTo2).toNumber() / 100,
+    maxDuration: maxDuration.toNumber(),
+  }
+}
+
+const secondsPerYear = 3600 * 24 * 365;
+
+function computePremium(rmParams, payout, lossProb, expiration) {
+  const purePremium = payout * lossProb * rmParams.moc;
+  const jrScr = Math.max(payout * rmParams.jrCollRatio - purePremium, 0);
+  const srScr = Math.max(payout * rmParams.collRatio - purePremium - jrScr, 0);
+  const now = Math.round((new Date()).getTime() / 1000);
+  const jrCoc = ((expiration - now) / secondsPerYear) * rmParams.jrRoc * jrScr;
+  const srCoc = ((expiration - now) / secondsPerYear) * rmParams.srRoc * srScr;
+  const ensuroCommission = purePremium * rmParams.ensuroPpFee + (jrCoc + srCoc) * rmParams.ensuroCocFee;
+  const minimumPremium = purePremium + jrCoc + srCoc + ensuroCommission;
+  return {
+    minimumPremium: minimumPremium,
+    purePremium: purePremium,
+    ensuroCommission: ensuroCommission,
+    jrCoc: jrCoc,
+    srCoc: srCoc,
+    jrScr: jrScr,
+    srScr: srScr,
+  }
+}
+
 module.exports = {
   newPolicy, newFlightDelayPolicy, newSignedQuotePolicy,
   resolvePolicy, resolvePolicyFullPayout, resolveFlightDelayPolicy,
+  fetchRiskModuleParams, computePremium,
   _A, _W,
   decodeNewPolicyReceipt, getABI,
 };
