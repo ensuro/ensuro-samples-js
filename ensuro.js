@@ -209,7 +209,6 @@ function computePremium(rmParams, payout, lossProb, expiration) {
   const srCoc = ((expiration - now) / secondsPerYear) * rmParams.srRoc * srScr;
   const ensuroCommission = purePremium * rmParams.ensuroPpFee + (jrCoc + srCoc) * rmParams.ensuroCocFee;
   const minimumPremium = purePremium + jrCoc + srCoc + ensuroCommission;
-  if (jrScr)
   return {
     minimumPremium: minimumPremium,
     purePremium: purePremium,
