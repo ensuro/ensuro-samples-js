@@ -162,7 +162,16 @@ async function quotePolicy(argv) {
     // Assume timestamp in ISO-8601 format
     expiration = argv.expiration;
   }
-  const jsonParams = {payout: argv.payout, expiration: expiration, data: JSON.parse(argv.jsonData)};
+  let jsonData;
+  if (argv.jsonData.startsWith("https://") || argv.jsonData.startsWith("http://")) {
+    // Remote JSON file
+    jsonData = (await axios.get(argv.jsonData)).data;
+  } else if (argv.jsonData.endsWith(".json")) {
+    jsonData = JSON.parse(fs.readFileSync(argv.policyData));
+  } else {
+    jsonData = JSON.parse(argv.jsonData);
+  }
+  const jsonParams = {payout: argv.payout, expiration: expiration, data: jsonData};
   console.log(`Calling '${argv.apiEndpoint}' with these params: `, jsonParams);
   const response = await axios.post(
     argv.apiEndpoint,
@@ -174,6 +183,7 @@ async function quotePolicy(argv) {
   } else {
     // If saving to a file, I save in the format required by newPolicyCommand for signed quotes,
     // similar to `sample-policy-signed-quote.json`
+    console.log("Response: ", response.data);
     const output = {
       payout: argv.payout,
       premium: response.data.premium,

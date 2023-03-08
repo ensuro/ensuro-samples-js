@@ -15,6 +15,10 @@ on:
         description: "Maximum payout of the policy"
         required: false
         default: '1000'
+      expiration:
+        description: "Expiration (in seconds)"
+        required: false
+        default: '2592000'
       actual_payout:
         description: "Actual Payout of policy resolution"
         required: false
@@ -49,8 +53,12 @@ jobs:
           echo "::add-mask::$QUOTE_API_KEY"
           export RM_ADDRESS=`curl -s --request OPTIONS --url $QUOTE_API_URL --header "x-api-key: $QUOTE_API_KEY" --header 'accept: application/application/json' --header 'content-type: application/json'  | jq -r ".risk_module"`
           echo "RiskModule: '$RM_ADDRESS'"
-          ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout ${{ github.event.inputs.max_payout }} --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
+          ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout ${{ github.event.inputs.max_payout }} --expiration ${{ github.event.inputs.max_payout }} --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
           sleep 15
+          echo "Inputs Used for SignedQuote: "
+          cat signed-quote-policy-input.json
           ./cli.js new-policy signed-quote-policy-input.json ${{ github.event.inputs.customer }} --output-file signed-quote-policy-output.json
+          echo "Signed Quote Output: "
+          cat signed-quote-policy-output.json
           sleep 15
           ./cli.js resolve-policy signed-quote-policy-output.json  ${{ github.event.inputs.actual_payout }}
