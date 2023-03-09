@@ -53,7 +53,7 @@ jobs:
           echo "::add-mask::$QUOTE_API_KEY"
           export RM_ADDRESS=`curl -s --request OPTIONS --url $QUOTE_API_URL --header "x-api-key: $QUOTE_API_KEY" --header 'accept: application/application/json' --header 'content-type: application/json'  | jq -r ".risk_module"`
           echo "RiskModule: '$RM_ADDRESS'"
-          ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout ${{ github.event.inputs.max_payout }} --expiration ${{ github.event.inputs.max_payout }} --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
+          ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout ${{ github.event.inputs.max_payout }} --expiration ${{ github.event.inputs.expiration }} --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
           sleep 15
           echo "Inputs Used for SignedQuote: "
           cat signed-quote-policy-input.json
