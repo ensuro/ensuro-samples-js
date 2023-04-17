@@ -27,6 +27,10 @@ on:
         description: "Customer address, will receive the payout"
         required: false
         default: '0xD758aF6BFC2f0908D7C5f89942be52C36a6b3cab'
+      risk_module:
+        description: "Risk Module address, if empty obtained automatically"
+        required: false
+        default: ''
 jobs:
   tests:
     name: Tests
@@ -52,6 +56,8 @@ jobs:
           echo "::add-mask::$QUOTE_API_URL"
           echo "::add-mask::$QUOTE_API_KEY"
           export RM_ADDRESS=`curl -s --request OPTIONS --url $QUOTE_API_URL --header "x-api-key: $QUOTE_API_KEY" --header 'accept: application/application/json' --header 'content-type: application/json'  | jq -r ".risk_module"`
+          export MANUAL_RM=${{ github.event.inputs.risk_module }}
+          export RM_ADDRESS=${MANUAL_RM:-${RM_ADDRESS}}
           echo "RiskModule: '$RM_ADDRESS'"
           ./cli.js quote-policy ${{ github.event.inputs.api_url }} --payout ${{ github.event.inputs.max_payout }} --expiration ${{ github.event.inputs.expiration }} --json-data '${{ github.event.inputs.json_data }}' --output-file signed-quote-policy-input.json
           sleep 15
