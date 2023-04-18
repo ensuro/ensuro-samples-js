@@ -43,7 +43,8 @@ async function newPolicyCommand(argv) {
 async function resolvePolicyCommand(argv) {
   const ABI = ensuro.getABI(argv.rmType);
   const policyData = JSON.parse(fs.readFileSync(argv.policyData));
-  const rm = new ethers.Contract(policyData.riskModule || policyData.data[11], ABI, signer);
+  const rmAddress = argv.rmAddress || policyData.riskModule || policyData.data[11];
+  const rm = new ethers.Contract(rmAddress, ABI, signer);
   let tx;
   if (argv.result.toLowerCase() == "false" || argv.result.toLowerCase() == "true") {
     tx = await ensuro.resolvePolicyFullPayout(policyData.data, argv.result.toLowerCase() == "true", rm);
@@ -275,6 +276,11 @@ Can be sent as ISO 8601 timestamp, epoch timestamp or integer (seconds relative 
     yargs.option("rmType", {
       describe: "Type of RiskModule",
       default: "SignedQuoteRiskModule"
+    });
+    yargs.option("rmAddress", {
+      describe: "Address of the RiskModule contract (if undefined, took from policyData)",
+      type: "string",
+      default: undefined
     });
   }, resolvePolicyCommand)
   .command('resolve-fd-policy <internalId> [--rm <rm-address>]',

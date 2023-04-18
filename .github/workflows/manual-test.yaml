@@ -67,4 +67,4 @@ jobs:
           echo "Signed Quote Output: "
           cat signed-quote-policy-output.json
           sleep 15
-          ./cli.js resolve-policy signed-quote-policy-output.json  ${{ github.event.inputs.actual_payout }}
+          ./cli.js resolve-policy signed-quote-policy-output.json ${{ github.event.inputs.actual_payout }} --rm-address $RM_ADDRESS
