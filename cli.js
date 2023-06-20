@@ -206,6 +206,93 @@ async function quotePolicy(argv) {
   }
 }
 
+async function newPolicyWebhook(argv) {
+  /**
+   * curl --request POST \
+   * --url https://dynamic-pricing-btzmg4hp.nw.gateway.dev/api/v0/dlt/new-policy \
+   * --header 'accept: application/application/json' \
+   * --header 'content-type: application/json' \
+   * --header 'x-api-key: <APIKEY-FROM-ENV>' \
+   * --header 'X-Ensuro-Signature: <hmac-sha256-signature-using-argv.signatureSecret>' OR \
+   * --header 'X-EIP191-Signature: <EIP191-signature-using-argv.eip191SigningKey>' \
+   * --data '{"payout": "5000","expiration": "2023-01-01T21:36:07.211025Z",
+   *          "data": {"payout_type": "proportional", "client_name": "Foo Inc."}}'
+   */
+  const API_KEY = process.env.QUOTE_API_KEY;
+  if (!API_KEY) {
+    console.log("Error, API key not defined, must define environment variable QUOTE_API_KEY");
+    process.exit(1);
+  }
+  let expiration;
+  if (argv.expiration.match(RegExp("^1[0-9]{9}$"))) {
+    // Timestamp
+    expiration = parseInt(argv.expiration);
+  } else if (argv.expiration.match(RegExp("^[0-9]{1,8}$"))) {
+    // Relative Timestamp
+    expiration = Math.round((new Date()).getTime() / 1000) + parseInt(argv.expiration);
+  } else {
+    // Assume timestamp in ISO-8601 format
+    expiration = argv.expiration;
+  }
+  let jsonData;
+  if (argv.jsonData.startsWith("https://") || argv.jsonData.startsWith("http://")) {
+    // Remote JSON file
+    jsonData = (await axios.get(argv.jsonData)).data;
+  } else if (argv.jsonData.endsWith(".json")) {
+    jsonData = JSON.parse(fs.readFileSync(argv.policyData));
+  } else {
+    jsonData = JSON.parse(argv.jsonData);
+  }
+  const jsonParams = {payout: argv.payout, expiration: expiration, data: jsonData};
+  console.log(`Calling '${argv.apiEndpoint}' with these params: `, jsonParams);
+  const headers = {"x-api-key": API_KEY};
+  const requestBody = JSON.stringify(jsonParams);
+  if (argv.signatureSecret) {
+    headers["X-Ensuro-Signature"] = ethers.utils.computeHmac(
+      "sha256",
+      ethers.utils.toUtf8Bytes(argv.signatureSecret),
+      ethers.utils.toUtf8Bytes(requestBody),
+    ).replace(/^0x/, "");
+  } else if (argv.eip191SigningKey) {
+    const contentDigest = ethers.utils.sha256(ethers.utils.toUtf8Bytes(requestBody)).replace(/^0x/, "");
+    const wallet = new ethers.Wallet(argv.eip191SigningKey);
+    headers["X-EIP191-Signature"] = await wallet.signMessage(contentDigest);
+  } else {
+    console.log("Error, you must specify either eip191SigningKey or signatureSecret");
+    process.exit(1);
+  }
+  const response = await axios.post(
+    argv.apiEndpoint,
+    requestBody,
+    {headers: headers}
+  );
+  if (argv.outputFile == "-") {
+    console.log("Response: ", response.data);
+  } else {
+    // If saving to a file, I save in the format required by newPolicyCommand for signed quotes,
+    // similar to `sample-policy-signed-quote.json`
+    console.log("Response: ", response.data);
+    const output = {
+      payout: argv.payout,
+      premium: response.data.premium,
+      lossProb: response.data.loss_prob,
+      expiration: response.data.expiration,
+      data_hash: response.data.data_hash,
+      quote: {
+        signature_r: response.data.signature.r,
+        signature_vs: response.data.signature.vs,
+        valid_until: response.data.valid_until,
+      }
+    }
+    fs.writeFile(argv.outputFile, JSON.stringify(output, null, 4), (err) => {
+      if (err) {
+        console.error(err);
+        process.exit(1);
+      }
+    });
+  }
+}
+
 yargs.scriptName("ensuro-cli")
   .usage('$0 <cmd> [args]')
   .command('new-policy <policyData> <customer> [--rm <rm-address>]',
@@ -264,6 +351,44 @@ Can be sent as ISO 8601 timestamp, epoch timestamp or integer (seconds relative 
       default: "-"
     });
   }, quotePolicy)
+  .command('new-policy-webhook <apiEndpoint>',
+           'Create a policy using the webhook', (yargs) => {
+    yargs.positional('apiEndpoint', {
+      type: 'string',
+      describe: `The Quote API endpoint.
+Example: https://dynamic-pricing-btzmg4hp.nw.gateway.dev/api/v0/<customer>/new-policy`
+    });
+    yargs.option('jsonData', {
+      type: 'string',
+      describe: `Extra data of the policy to be used for the quote and stored.
+It will be converted to a blind hash on-chain`
+    });
+    yargs.option("payout", {
+      describe: "Maximum payout of the policy",
+      type: 'number',
+    });
+    yargs.option("expiration", {
+      describe: `Expiration of the policy.
+Can be sent as ISO 8601 timestamp, epoch timestamp or integer (seconds relative to now)`,
+      type: 'string',
+      default: '2592000', // 30 days (in seconds)
+    });
+    yargs.option("eip191SigningKey", {
+      type: "string",
+      describe: "Signing key to do the EIP-191 signature of the request body",
+      default: null
+    });
+    yargs.option("signatureSecret", {
+      type: "string",
+      describe: "Signing secret to do the HMAC-SHA256 signature of the request body",
+      default: null
+    });
+    yargs.option("outputFile", {
+      type: "string",
+      describe: "Output file where the policy data will be saved (json). Default stdout",
+      default: "-"
+    });
+  }, newPolicyWebhook)
   .command('resolve-policy <policyData> <result>', 'Resolve policy', (yargs) => {
     yargs.positional('policyData', {
       type: 'string',
